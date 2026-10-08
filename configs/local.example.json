@@ -1,0 +1,13 @@
+{
+  "projects_root": "C:/Users/Ali Ali/Desktop/atish/AndroidBuild/successful_projects",
+  "findings_input_dir": "C:/Users/Ali Ali/Desktop/atish/AndroidBuild/artifact",
+  "validation_csv": "data/benchmark/raw/leakscope_validated_388.csv",
+  "source_index_db": "data/manifests/source_index.sqlite",
+  "normalized_findings": "data/normalized/leakscope_cases.jsonl",
+  "findings_report": "data/normalized/normalization_report.json",
+  "normalized_benchmark": "data/benchmark/processed/leakscope_gold_388.jsonl",
+  "benchmark_report": "data/benchmark/processed/benchmark_report.json",
+  "validation_label_column": "Annotator_1_Label",
+  "validation_label_provenance": "Final adjudicated label used in the submitted LeakScope paper; stored in Annotator_1_Label in the exported CSV"
+}
+

@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+configs/local.json
+data/manifests/*.sqlite*
+data/normalized/*.jsonl
+data/normalized/*.json
+data/benchmark/processed/*.jsonl
+data/benchmark/processed/*.json
+results/
+
+# Generated data and local experiment artifacts
+/data/
+/results/
+*.bak
+*.bak.*
+*.sqlite
+*.sqlite-*
+smoke.json
+
+# Machine-specific and diagnostic configurations
+/configs/*.json
+!/configs/*.example.json
+!/configs/docs.json

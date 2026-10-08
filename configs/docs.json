@@ -1,0 +1,74 @@
+{
+    "entries":  [
+                    {
+                        "slug":  "memory-overview",
+                        "url":  "https://developer.android.com/topic/performance/memory",
+                        "title":  "Android memory overview"
+                    },
+                    {
+                        "slug":  "manage-app-memory",
+                        "url":  "https://developer.android.com/topic/performance/memory/manage-app-memory",
+                        "title":  "Manage your app\u0027s memory"
+                    },
+                    {
+                        "slug":  "fragment-lifecycle",
+                        "url":  "https://developer.android.com/guide/fragments/lifecycle",
+                        "title":  "Fragment lifecycle"
+                    },
+                    {
+                        "slug":  "view-binding",
+                        "url":  "https://developer.android.com/topic/libraries/view-binding",
+                        "title":  "View binding"
+                    },
+                    {
+                        "slug":  "viewmodel-overview",
+                        "url":  "https://developer.android.com/topic/libraries/architecture/viewmodel",
+                        "title":  "ViewModel overview"
+                    },
+                    {
+                        "slug":  "state-holders",
+                        "url":  "https://developer.android.com/topic/architecture/ui-layer/stateholders",
+                        "title":  "State holders and UI state"
+                    },
+                    {
+                        "slug":  "services-overview",
+                        "url":  "https://developer.android.com/develop/background-work/services",
+                        "title":  "Services overview"
+                    },
+                    {
+                        "slug":  "service-api",
+                        "url":  "https://developer.android.com/reference/android/app/Service",
+                        "title":  "Service API reference"
+                    },
+                    {
+                        "slug":  "threading-performance",
+                        "url":  "https://developer.android.com/topic/performance/threads",
+                        "title":  "Better performance through threading"
+                    },
+                    {
+                        "slug":  "custom-back",
+                        "url":  "https://developer.android.com/guide/navigation/navigation-custom-back",
+                        "title":  "Provide custom back navigation"
+                    },
+                    {
+                        "slug":  "billing-client",
+                        "url":  "https://developer.android.com/reference/com/android/billingclient/api/BillingClient",
+                        "title":  "BillingClient reference"
+                    },
+                    {
+                        "slug":  "window-info-tracker",
+                        "url":  "https://developer.android.com/reference/androidx/window/layout/WindowInfoTracker",
+                        "title":  "WindowInfoTracker reference"
+                    },
+                    {
+                        "slug":  "lint",
+                        "url":  "https://developer.android.com/studio/write/lint",
+                        "title":  "Improve your code with lint checks"
+                    },
+                    {
+                        "slug":  "activity-lifecycle",
+                        "url":  "https://developer.android.com/guide/components/activities/activity-lifecycle",
+                        "title":  "The activity lifecycle"
+                    }
+                ]
+}
