@@ -84,7 +84,7 @@ class GenerationResult:
 class Model:
     name: str = "abstract"
 
-    def generate(self, prompt: str, system: str = "", json_mode: bool = False) -> GenerationResult:
+    def generate(self, prompt: str, system: str = "", json_mode: bool = False, output_schema: dict | str | None = None) -> GenerationResult:
         raise NotImplementedError
 
 
@@ -110,11 +110,13 @@ class OllamaModel(Model):
         self.options = merged
         self.keep_alive = keep_alive
 
-    def generate(self, prompt: str, system: str = "", json_mode: bool = False) -> GenerationResult:
+    def generate(self, prompt: str, system: str = "", json_mode: bool = False, output_schema: dict | str | None = None) -> GenerationResult:
         payload: dict = {"model": self.name, "prompt": prompt, "stream": False}
         if system:
             payload["system"] = system
-        if json_mode:
+        if output_schema is not None:
+            payload["format"] = output_schema
+        elif json_mode:
             payload["format"] = DECISION_SCHEMA
         if self.options:
             payload["options"] = self.options
@@ -153,6 +155,11 @@ class OllamaModel(Model):
                 model=self.name,
                 error=f"Ollama request timed out after {self.timeout}s",
             )
+        if not isinstance(body, dict):
+            raise ModelError("Ollama returned a non-object response")
+        if body.get("done") is not True:
+            return GenerationResult(text=body.get("response", ""), model=body.get("model") or self.name,
+                                    raw=body, error="Ollama returned an incomplete response (done != true)")
         return GenerationResult(
             text=body.get("response", ""),
             model=body.get("model", self.name),
