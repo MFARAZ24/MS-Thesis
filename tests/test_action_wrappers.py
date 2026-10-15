@@ -28,6 +28,7 @@ class ActionWrapperTest(unittest.TestCase):
         ))
         wrappers = [
             action,
+            action + "\n\nThis request continues reading the class.",
             "```json\n" + action + "\n```",
             "Explanation.\n\n**Action:** " + action,
             "Explanation.\n\n**Action:**\n```json\n" + action + "\n```",
@@ -45,7 +46,6 @@ class ActionWrapperTest(unittest.TestCase):
         ))
         invalid = [
             "**Action:** " + action + "\n**Action:** " + action,
-            "**Action:** " + action + "\nExtra trailing prose.",
             "```json\n" + action,
             "**Action:** " + action + "\n" + action,
             "**Action:** {broken}",

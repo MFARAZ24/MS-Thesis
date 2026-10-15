@@ -258,6 +258,8 @@ def _run_agent(args: argparse.Namespace) -> dict:
         "max_code_blocks": int(cfg.get("max_code_blocks", 3)),
         "max_docs": int(cfg.get("max_docs", 4)),
     }
+    collector_kwargs["investigation_mode"] = cfg.get("investigation_mode", "fixed")
+    collector_kwargs["investigation_limits"] = cfg.get("investigation_limits", {})
     log_dir = None if args.no_log else Path(cfg.get("log_dir", "data/agent/runs"))
 
     if args.agent_action == "run":

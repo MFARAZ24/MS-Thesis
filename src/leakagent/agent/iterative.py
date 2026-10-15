@@ -29,8 +29,36 @@ and relevant lifecycle cleanup. A missing call in a partial excerpt is not proof
 Tool actions: {"action":"tool","tool":"read_source","arguments":{"path":"...","start_line":1,"end_line":40}}
 Tools (project is fixed by the host; never supply a project):
 find_symbol(name), find_method(class_name, method), find_api_calls(pattern),
-read_source(path, start_line, end_line), search_docs(query).
+read_source(path, start_line, end_line), read_class(path, name), search_docs(query).
+For a newly located type, prefer read_class with its exact path and simple class name.
+read_class returns a heuristic excerpt beginning at the declaration, at most 60 lines.
+It does not guarantee all fields are visible. Continue with read_source when needed.
 Search results locate code; use read_source to obtain citable source evidence.
+
+Stored-reference investigation:
+- For a retained object, trace what it stores, including values inside maps,
+  collections, arrays, and wrapper objects.
+- Use declarations, assignments, and insertion calls to identify stored types.
+  Resolve relevant project-defined types with find_symbol and inspect their
+  instance fields and superclass before concluding whether they retain UI.
+- Prioritize an unresolved stored type over reading unrelated holder methods.
+- Imports, class names, Parcelable, and Serializable do not establish either
+  UI retention or safety.
+- Establish whether a UI reference exists before assessing whether cleanup
+  releases it at the required lifecycle boundary.
+- If the reference chain remains unresolved, name the specific missing type
+  or relationship in the final explanation.
+
+
+Tool-result handling:
+- find_symbol returns file locations, not source evidence. After a successful lookup,
+  use read_source with the exact relative_path returned; do not guess another path.
+- Reuse previous search results instead of repeating the same lookup.
+- If a source excerpt contains only a license, package, or imports, continue from
+  next_start_line to reach declarations, or use a targeted search.
+- A recoverable tool error does not establish insufficient source evidence.
+  Correct the request when the available results show how to do so.
+
 
 Investigation strategy:
 - Use searches to locate relevant declarations instead of reading a file sequentially.
@@ -78,6 +106,7 @@ class ToolSession:
     def execute(self, tool, args):
         allowed = {
             "read_source": {"path", "start_line", "end_line"},
+            "read_class": {"path", "name"},
             "find_symbol": {"name"}, "find_method": {"class_name", "method"},
             "find_api_calls": {"pattern"}, "search_docs": {"query"},
         }
@@ -89,7 +118,7 @@ class ToolSession:
             ):
                 raise ValueError(f"Invalid {key}")
         project = self.case.project
-        if tool == "read_source":
+        if tool in {"read_source", "read_class"}:
             raw_path = args["path"]
             normal = raw_path.replace("\\", "/")
             if Path(normal).is_absolute() or PureWindowsPath(raw_path).drive or ".." in Path(normal).parts:
@@ -101,13 +130,47 @@ class ToolSession:
             indexed = {f["relative_path"] for f in self.repo.list_project_files(project)}
             if normal not in indexed:
                 raise ValueError("Source path not in candidate project's index")
-            first, last = args["start_line"], args["end_line"]
-            if type(first) is not int or type(last) is not int or first < 1 or last < first:
-                raise ValueError("Use positive integer line numbers with end_line >= start_line")
             text = self.repo.read_source(project, normal)
             if text is None:
                 raise ValueError("Source unavailable")
             lines = text.splitlines()
+            if tool == "read_class":
+                import re
+                name = args["name"]
+                if not re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", name):
+                    raise ValueError("Use a simple class name")
+                # Mask comments while preserving line numbers. This is a
+                # declaration locator, not a complete Java/Kotlin parser.
+                masked = re.sub(
+                    r"/\*.*?\*/|//[^\n]*",
+                    lambda match: "".join(
+                        "\n" if char == "\n" else " "
+                        for char in match.group()
+                    ),
+                    text,
+                    flags=re.DOTALL,
+                )
+                pattern = re.compile(
+                    r"^\s*(?:(?:public|protected|private|abstract|final|static|"
+                    r"open|data|sealed|internal|expect|actual|value|enum|annotation)\s+)*"
+                    r"(?:class|interface|enum|record|object)\s+"
+                    + re.escape(name) + r"\b"
+                )
+                matches = [
+                    number for number, line in enumerate(masked.splitlines(), 1)
+                    if pattern.search(line)
+                ]
+                if len(matches) != 1:
+                    raise ValueError(
+                        "Declaration not uniquely located; use read_source "
+                        "or a targeted search"
+                    )
+                first = matches[0]
+                last = first + 59
+            else:
+                first, last = args["start_line"], args["end_line"]
+                if type(first) is not int or type(last) is not int or first < 1 or last < first:
+                    raise ValueError("Use positive integer line numbers with end_line >= start_line")
             if first > len(lines):
                 raise ValueError("Start line beyond file")
             requested_last = last
@@ -213,7 +276,12 @@ def investigate(case, repo, docs, model, max_turns=8, max_tool_calls=6,
                     and lines[-1].strip() == "```"
                 ):
                     action_text = "\n".join(lines[1:-1])
-            action = json.loads(action_text)
+            action, decoded_end = json.JSONDecoder().raw_decode(action_text)
+            trailing = action_text[decoded_end:].strip()
+            if trailing and any(token in trailing for token in ("{", "}", "[", "]", "```")):
+                raise json.JSONDecodeError(
+                    "Ambiguous trailing content", action_text, decoded_end
+                )
         except (json.JSONDecodeError, TypeError):
             return fail("Action is not JSON", "parse_error", result.text, metadata), session.bundle, trajectory
         if not isinstance(action, dict) or action.get("action") not in {"tool", "final"}:
@@ -237,7 +305,46 @@ def investigate(case, repo, docs, model, max_turns=8, max_tool_calls=6,
                 continue
             return fail("Invalid action", "schema_error", result.text, metadata), session.bundle, trajectory
         if action["action"] == "final":
-            return session.finalize(action, result.text, metadata), session.bundle, trajectory
+            decision = session.finalize(action, result.text, metadata)
+            # One bounded opportunity to investigate before accepting abstention.
+            # Reserve turns for a lookup, a source read, and a final answer.
+            can_follow_up = (
+                decision.parse_status == "ok"
+                and decision.decision == "inconclusive"
+                and max_turns - number >= 3
+                and max_tool_calls - calls >= 2
+                and session.used_chars < session.max_chars
+                and not any(item.get("abstention_followup") for item in transcript)
+            )
+            if can_follow_up:
+                feedback = {
+                    "abstention_followup": True,
+                    "proposed_final": action,
+                    "feedback": (
+                        "Before finalizing, review the specific uncertainty in "
+                        "your proposed answer. If an available tool can resolve "
+                        "it, perform a targeted lookup and read the relevant "
+                        "source. Reuse previous lookup results. Do not repeat "
+                        "unrelated source reads. If further retrieval cannot "
+                        "resolve the uncertainty, you may immediately return "
+                        "inconclusive and explain the limitation. Do not change "
+                        "the conclusion merely to avoid abstaining. Return one "
+                        "tool or final JSON action using the existing protocol."
+                    ),
+                }
+                next_prompt = json.dumps({
+                    "finding": finding,
+                    "tool_history": transcript + [feedback],
+                    "remaining_tool_calls": max_tool_calls - calls,
+                    "remaining_turns": max_turns - number - 1,
+                }, ensure_ascii=False)
+                if len(next_prompt) + len(SYSTEM) <= max_prompt_chars:
+                    transcript.append(feedback)
+                    turn["abstention_followup_requested"] = True
+                    if on_turn:
+                        on_turn(trajectory)
+                    continue
+            return decision, session.bundle, trajectory
         if calls >= max_tool_calls:
             return fail("Tool-call budget exhausted", "budget_exhausted"), session.bundle, trajectory
         calls += 1
@@ -245,7 +352,7 @@ def investigate(case, repo, docs, model, max_turns=8, max_tool_calls=6,
         signature = json.dumps(action, sort_keys=True)
         try:
             if signature in seen:
-                raise ValueError("Repeated identical tool request; use new evidence or finish")
+                raise ValueError("Repeated identical tool request. Reuse the earlier result; no tool was executed. If find_symbol already returned hits, copy an exact relative_path into read_source. Otherwise choose a different targeted search.")
             seen.add(signature)
             answer = session.execute(action.get("tool"), action.get("arguments"))
         except (ValueError, TypeError, KeyError, OSError) as exc:

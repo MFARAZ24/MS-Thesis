@@ -43,6 +43,9 @@ def _metrics_for(results: list[CaseResult]) -> dict:
         "parse_error_count": sum(1 for r in results if r.parse_status == "parse_error"),
         "schema_error_count": sum(1 for r in results if r.parse_status == "schema_error"),
         "model_error_count": sum(1 for r in results if r.parse_status == "model_error"),
+        "budget_exhausted_count": sum(1 for r in results if r.parse_status == "budget_exhausted"),
+        "total_model_turns": sum(r.model_turns for r in results),
+        "total_tool_calls": sum(r.tool_calls for r in results),
         "reasoned_abstention_count": sum(
             1 for r in results
             if r.decision == "inconclusive" and r.parse_status == "ok"

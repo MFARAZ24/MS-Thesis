@@ -120,8 +120,14 @@ def _verify_citations(decision: Decision, evidence: EvidenceBundle) -> list[str]
         visible = {}
         for block in evidence.code:
             if block.path == path:
+                # Evidence excerpts are joined with newline separators.
+                # Preserve a final blank source line, but never extend beyond
+                # the block's declared source range.
+                block_lines = block.text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+                declared_count = block.line_end - block.line_start + 1
                 for number, text in enumerate(
-                    block.text.splitlines(), start=block.line_start
+                    block_lines[:max(0, declared_count)],
+                    start=block.line_start,
                 ):
                     visible[number] = text
         for hit in evidence.api_hits:
